@@ -62,31 +62,27 @@
     <!-- 第三行 -->
     <div class="action-btn">
       <el-button size="mini"
-                 @click="tapHistoryBtn(-1)"
+                 @click="undoDraw()"
                  class="btn-tool">撤销</el-button>
       <el-button size="mini"
-                 @click="tapHistoryBtn(1)"
+                 @click="redoDraw()"
                  class="btn-tool">重做</el-button>
 
       <el-button size="mini"
-                 @click="tapClearBtn"
+                 @click="clear()"
                  class="btn-tool">清除</el-button>
       <el-button size="mini"
-                 @click="tapSaveBtn"
-                 class="btn-tool">导出</el-button>
+                 @click="save()"
+                 class="btn-tool">保存</el-button>
     </div>
     <!-- 第四行 -->
     <div class="last-btn">
       <el-button size="mini"
-                 @click="exportCanvasBtn"
-                 class="btn-tool">导出画布数据</el-button>
-      <el-button size="mini"
-                 @click="renderCanvasBtn"
-                 class="btn-tool">渲染画布</el-button>
-      <el-button size="mini"
                  class="btn-tool"
                  @click="addCanvas">新建画布</el-button>
-      <el-button size="mini"
+      <!-- TODO:只有一个画布时不显示选择画布按钮 -->
+      <el-button v-if="myMapChangeTracker"
+                 size="mini"
                  class="btn-tool"
                  @click="changeCanvas">选择画布</el-button>
     </div>
@@ -100,14 +96,17 @@
                :visible.sync="dialogVisible"
                width="80%"
                :before-close="handleClose">
-      <div v-for="(item, key) in canvasMap"
-           :key="key"
-           @click="renderCanvasBtn(item[1].path)"
-           style="width: 400px; height: 300px">
-        <img :src="item[1].img"
-             style="width: 100%;height: 100%"
-             alt="">
+      <div class="canvas-box">
+        <div class="canvas-item"
+             v-for="(item, key) in canvasMap"
+             :key="key"
+             @click="renderCanvasBtn(item[0], item[1].path)">
+          <img :src="item[1].img"
+               style="width: 100%;height: 100%"
+               alt="">
+        </div>
       </div>
+
     </el-dialog>
   </div>
 </template>
@@ -184,9 +183,11 @@ export default {
       currentState: '', // 画布数据
 
       canvasMap: new Map(),
-      key: 0,
+      key: 1,
 
-      dialogVisible: false
+      dialogVisible: false,
+      myMapChangeTracker: 0,
+      currentCanvas: 0
     };
   },
   watch: {
@@ -257,7 +258,8 @@ export default {
 
       // 监听鼠标按下事件
       this.canvas.on("mouse:down", (options) => {
-
+        console.log('-----', this.selectTool, this.textObject);
+        // TODO:此处指的是什么
         if (this.selectTool !== 'text' && this.textObject) {
           // 如果当前存在文本对象，并且不是进行添加文字操作 则 退出编辑模式，并删除临时的文本对象
           // 将当前文本对象退出编辑模式
@@ -326,34 +328,11 @@ export default {
           }
         }
       });
-      // 监听画布渲染完成
-      this.canvas.on("after:render", () => {
+      this.canvas.on('object:added', () => {
         if (!this.isRedoing) {
-          // 当前不是进行撤销或重做操作
-          // 在绘画时会频繁触发该回调，所以间隔1s记录当前状态
-          if (this.recordTimer) {
-            clearTimeout(this.recordTimer)
-            this.recordTimer = null
-          }
-          this.recordTimer = setTimeout(() => {
-            this.stateArr.push(JSON.stringify(this.canvas))
-            this.stateIdx++
-          }, 100)
-        } else {
-          // 当前正在执行撤销或重做操作，不记录重新绘制的画布
-          this.isRedoing = false
+          this.stateArr = [];
         }
-      })
-    },
-    // 初始化画笔工具
-    initBruch () {
-      // 设置绘画模式画笔类型为 铅笔类型
-      this.canvas.freeDrawingBrush = new fabric.PencilBrush(this.canvas);
-      // 设置画布模式为绘画模式
-      this.canvas.isDrawingMode = true;
-      // 设置绘画模式 画笔颜色与画笔线条大小
-      this.canvas.freeDrawingBrush.color = this.strokeColor;
-      this.canvas.freeDrawingBrush.width = parseInt(this.lineSize, 10);
+      });
     },
     // 初始化 绘制直线
     initLine () {
@@ -452,12 +431,6 @@ export default {
         return;
       }
     },
-    // 初始化橡皮擦功能
-    initEraser () {
-      this.canvas.freeDrawingBrush = new fabric.EraserBrush(this.canvas);
-      this.canvas.freeDrawingBrush.width = parseInt(this.lineSize, 10);
-      this.canvas.isDrawingMode = true;
-    },
     // 初始化画布移动
     initMove () {
       var vpt = this.canvas.viewportTransform;
@@ -466,6 +439,23 @@ export default {
       this.canvas.requestRenderAll();
       this.mouseFrom.x = this.mouseTo.x;
       this.mouseFrom.y = this.mouseTo.y;
+    },
+    // TODO:初始化橡皮擦功能
+    initEraser () {
+      this.canvas.freeDrawingBrush = new fabric.EraserBrush(this.canvas);
+      // this.canvas.freeDrawingBrush.width = parseInt(this.lineSize, 10);
+      this.canvas.freeDrawingBrush.width = 25;
+      this.canvas.isDrawingMode = true;
+    },
+    // 初始化画笔工具
+    initBruch () {
+      // 设置绘画模式画笔类型为 铅笔类型
+      this.canvas.freeDrawingBrush = new fabric.PencilBrush(this.canvas);
+      // 设置画布模式为绘画模式
+      this.canvas.isDrawingMode = true;
+      // 设置绘画模式 画笔颜色与画笔线条大小
+      this.canvas.freeDrawingBrush.color = this.strokeColor;
+      this.canvas.freeDrawingBrush.width = parseInt(this.lineSize, 10);
     },
     // 绘制图形
     startDrawingObject (canvasObject) {
@@ -487,7 +477,7 @@ export default {
     },
     // 绘图工具点击选择
     tapToolBtn (tool) {
-      if (this.selectTool == tool) return;
+      if (this.selectTool === tool) return;
       // 保存当前选中的绘图工具
       this.selectTool = tool;
 
@@ -501,58 +491,46 @@ export default {
           item.set("selectable", false);
         });
       }
-      if (this.selectTool == "brush") {
-        // 如果用户选择的是画笔工具，直接初始化，无需等待用户进行鼠标操作
-        this.initBruch();
-      } else if (this.selectTool == "eraser") {
-        // 如果用户选择的是橡皮擦工具，直接初始化，无需等待用户进行鼠标操作
-        this.initEraser();
+      switch (this.selectTool) {
+        case 'brush':
+          // 如果用户选择的是画笔工具，直接初始化，无需等待用户进行鼠标操作
+          this.initBruch();
+          break;
+        case 'eraser':
+          // 如果用户选择的是橡皮擦工具，直接初始化，无需等待用户进行鼠标操作
+          this.initEraser();
+          break;
+        default:
+          break;
       }
     },
-    // 缩放按钮点击
-    tapScaleBtn (flag) {
-      // flag -1 缩小 1 放大
-      let zoom = this.canvas.getZoom();
-      if (flag > 0) {
-        // 放大
-        zoom *= 1.1;
-      } else {
-        // 缩小
-        zoom *= 0.9;
-      }
-      // zoom 不能大于 20 不能小于0.01
-      zoom = zoom > 20 ? 20 : zoom;
-      zoom = zoom < 0.01 ? 0.01 : zoom;
-      this.canvas.setZoom(zoom);
-    },
-    // 撤销重做按钮点击
-    tapHistoryBtn (flag) {
-      this.isRedoing = true
-
-      let stateIdx = this.stateIdx + flag
-      // 判断是否已经到了第一步操作
-      if (stateIdx < 0) return;
-      // 判断是否已经到了最后一步操作
-      if (stateIdx >= this.stateArr.length) return;
-      if (this.stateArr[stateIdx]) {
-        this.canvas.loadFromJSON(this.stateArr[stateIdx])
-        if (this.canvas.getObjects().length > 0) {
-          this.canvas.getObjects().forEach(item => {
-            item.set('selectable', false)
-          })
-        }
-        this.stateIdx = stateIdx
+    // 撤销
+    undoDraw () {
+      if (this.canvas._objects.length > 0) {
+        this.stateArr.push(this.canvas._objects.pop());
+        this.canvas.renderAll();
       }
     },
-    // 监听画布重新绘制
-    tapClearBtn () {
-      let children = this.canvas.getObjects()
-      if (children.length > 0) {
-        this.canvas.remove(...children)
+    //重做
+    redoDraw () {
+      if (this.stateArr.length > 0) {
+        this.isRedoing = true;
+        this.canvas.add(this.stateArr.pop());
+        this.canvas.renderAll();
       }
     },
-    // 保存按钮点击
-    tapSaveBtn () {
+    // TODO:清空后还能撤销，监听画布重新绘制
+    clear () {
+      this.canvas.clear();
+      // 设置画布背景色 (背景色需要这样设置，否则拓展的橡皮功能会报错)
+      this.canvas.setBackgroundColor(this.bgColor, undefined, {
+        erasable: false,
+      });
+      this.resetMove();
+      this.isRedoing = false;
+      this.stateArr = [];
+    },
+    getCanvasDataUrl () {
       const dataURL = this.canvas.toDataURL({
         width: this.canvas.width,
         height: this.canvas.height,
@@ -560,15 +538,18 @@ export default {
         top: 0,
         format: 'png',
       });
-      this.canvasMap.set(this.key, { path: this.canvas.toJSON(), img: dataURL })
-      console.log('快照数据', this.canvasMap);
-      // const link = document.createElement('a');
-      // link.download = 'canvas.png';
-      // link.href = dataURL;
-      // document.body.appendChild(link);
-      // link.click();
-      // document.body.removeChild(link);
-      // })
+      return dataURL
+    },
+
+    // 保存按钮点击
+    save () {
+      const dataURL = this.getCanvasDataUrl();
+      const link = document.createElement('a');
+      link.download = 'canvas.png';
+      link.href = dataURL;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     },
     // 计算画布移动之后的x坐标点
     getTransformedPosX (x) {
@@ -579,39 +560,48 @@ export default {
       let zoom = Number(this.canvas.getZoom())
       return (y - this.canvas.viewportTransform[5]) / zoom;
     },
-    // 保存画布数据
-    exportCanvasBtn () {
-      //   this.currentState = this.canvas.toJSON();
-      //   console.log('currentState', this.currentState);
-      //   this.canvasMap.set(this.key, this.currentState);
-      this.tapSaveBtn()
+    // TODO:新建画布后撤销要回到上一个画布的内容
+    addCanvas () {
+      console.log('addCanvas');
+      const dataURL = this.getCanvasDataUrl();
+      if (this.currentCanvas) {
+        this.canvasMap.set(this.currentCanvas, { path: this.canvas.toJSON(), img: dataURL });
+        this.currentCanvas = 0;
+        this.clear();
+        return;
+      }
+      this.canvasMap.set(this.key, { path: this.canvas.toJSON(), img: dataURL });
+      this.myMapChangeTracker++;
+      console.log('快照数据', this.canvasMap);
       this.key++;
+      this.clear();
     },
-    renderCanvasBtn (path) {
+    renderCanvasBtn (currentCanvas, path) {
       // 加载画布信息
       console.log(this.canvas);
       this.canvas.loadFromJSON(path, () => {
         this.canvas.renderAll();
         this.dialogVisible = false;
+        this.currentCanvas = currentCanvas;
       });
     },
-    addCanvas () {
-      console.log('this.canvasMap', this.canvasMap);
-    },
+
+    // 选择画布
     changeCanvas () {
       this.dialogVisible = true;
-      // setTimeout(() => {
-      // for (const [key, value] of this.canvasMap) {
-      //   console.log(key, value);
-      //   console.log(new fabric.Canvas('0'));
-      //   const canvas = new fabric.Canvas('0');
-      //   canvas.loadFromJSON(value, () => {
-      //     // canvas.renderAll();
-      //   })
-      // }
-      // }, 6000)
+      const dataURL = this.getCanvasDataUrl();
+      if (this.currentCanvas) {
+        this.canvasMap.set(this.currentCanvas, { path: this.canvas.toJSON(), img: dataURL });
+        this.currentCanvas = 0;
+        return;
+      }
+      if (!this.canvasMap.has(this.key)) {
+        this.canvasMap.set(this.key, { path: this.canvas.toJSON(), img: dataURL });
+        this.key++
+        this.myMapChangeTracker++;
+      }
 
-
+      console.log('快照数据', this.canvasMap);
     },
     handleClose () {
       this.dialogVisible = false;
@@ -676,6 +666,16 @@ export default {
       color: #fff;
       border-color: #2962ff;
     }
+  }
+}
+.canvas-box {
+  display: flex;
+  flex-wrap: wrap;
+  .canvas-item {
+    width: 400px;
+    height: 300px;
+    border: 1px solid #ccc;
+    margin: 10px;
   }
 }
 </style>
