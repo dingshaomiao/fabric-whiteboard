@@ -1,6 +1,7 @@
 <template>
   <div class="home">
     <!-- 第一行 -->
+    <div>当前画布编码{{currentCanvas}}</div>
     <div class="btn-wrap">
       <div @click="showStrokeColorPicker = !showStrokeColorPicker"
            class="btn-color"
@@ -85,6 +86,7 @@
                  size="mini"
                  class="btn-tool"
                  @click="changeCanvas">选择画布</el-button>
+
     </div>
     <!-- 画布 -->
     <canvas id="c"
@@ -95,15 +97,20 @@
     <el-dialog title="选择画布"
                :visible.sync="dialogVisible"
                width="80%"
-               :before-close="handleClose">
+               :before-close="handleClose"
+               :close-on-click-modal="false">
       <div class="canvas-box">
         <div class="canvas-item"
              v-for="(item, key) in canvasMap"
-             :key="key"
-             @click="renderCanvasBtn(item[0], item[1].path)">
-          <img :src="item[1].img"
-               style="width: 100%;height: 100%"
-               alt="">
+             :key="key">
+          <div @click="renderCanvasBtn(item[0], item[1].path)"
+               style="width: 100%;height: 100%">
+            <img :src="item[1].img"
+                 style="width: 100%;height: 100%"
+                 alt="">
+          </div>
+
+          <i class="el-icon-circle-close delete-icon"></i>
         </div>
       </div>
 
@@ -180,14 +187,14 @@ export default {
       stateArr: [], // 保存画布的操作记录
       stateIdx: 0, // 当前操作步数
       isRedoing: false, // 当前是否在执行撤销或重做操作
-      currentState: '', // 画布数据
 
       canvasMap: new Map(),
-      key: 1,
+      key: 0,
 
       dialogVisible: false,
       myMapChangeTracker: 0,
-      currentCanvas: 0
+      currentCanvas: false,
+      isNewCanvas: false
     };
   },
   watch: {
@@ -560,51 +567,60 @@ export default {
       let zoom = Number(this.canvas.getZoom())
       return (y - this.canvas.viewportTransform[5]) / zoom;
     },
-    // TODO:新建画布后撤销要回到上一个画布的内容
-    addCanvas () {
-      console.log('addCanvas');
-      const dataURL = this.getCanvasDataUrl();
-      if (this.currentCanvas) {
-        this.canvasMap.set(this.currentCanvas, { path: this.canvas.toJSON(), img: dataURL });
-        this.currentCanvas = 0;
-        this.clear();
-        return;
-      }
-      this.canvasMap.set(this.key, { path: this.canvas.toJSON(), img: dataURL });
-      this.myMapChangeTracker++;
-      console.log('快照数据', this.canvasMap);
-      this.key++;
-      this.clear();
-    },
     renderCanvasBtn (currentCanvas, path) {
       // 加载画布信息
       console.log(this.canvas);
       this.canvas.loadFromJSON(path, () => {
         this.canvas.renderAll();
-        this.dialogVisible = false;
         this.currentCanvas = currentCanvas;
+        this.dialogVisible = false;
+        console.log(' renderCanvasBtn currentCanvas', this.currentCanvas);
       });
     },
+    // TODO:新建画布后撤销要回到上一个画布的内容
+    addCanvas () {
+      const dataURL = this.getCanvasDataUrl();
+      const res = this.isEditCanvas(dataURL);
+      console.log('addCanvas isEditCanvas', res);
+      if (!res) {
+        console.log('addCanvas');
+        this.canvasMap.set(++this.key, { path: this.canvas.toJSON(), img: dataURL });
+      }
+      this.myMapChangeTracker++;
+      this.isNewCanvas = true;
+      this.clear();
+      console.log('快照数据', this.canvasMap);
+    },
 
+    isEditCanvas (dataURL) {
+      console.log('isEditCanvas currentCanvas', this.currentCanvas);
+      if (!this.currentCanvas) return false;
+      this.canvasMap.set(this.currentCanvas, { path: this.canvas.toJSON(), img: dataURL });
+      this.currentCanvas = 0;
+      return true;
+    },
     // 选择画布
     changeCanvas () {
       this.dialogVisible = true;
       const dataURL = this.getCanvasDataUrl();
-      if (this.currentCanvas) {
-        this.canvasMap.set(this.currentCanvas, { path: this.canvas.toJSON(), img: dataURL });
-        this.currentCanvas = 0;
-        return;
-      }
-      if (!this.canvasMap.has(this.key)) {
-        this.canvasMap.set(this.key, { path: this.canvas.toJSON(), img: dataURL });
-        this.key++
+      const res = this.isEditCanvas(dataURL);
+      console.log('changeCanvas isEditCanvas', res, this.isNewCanvas);
+      if (res) return;
+      if (this.isNewCanvas) {
+        console.log('changeCanvas');
+        this.canvasMap.set(++this.key, { path: this.canvas.toJSON(), img: dataURL });
         this.myMapChangeTracker++;
+        this.isNewCanvas = false;
       }
 
       console.log('快照数据', this.canvasMap);
     },
     handleClose () {
+      console.log('handleClose currentCanvas', this.currentCanvas, this.key);
       this.dialogVisible = false;
+      // if (!this.currentCanvas) {
+      //   this.currentCanvas = this.key;
+      // }
     },
   },
   mounted () {
@@ -676,6 +692,13 @@ export default {
     height: 300px;
     border: 1px solid #ccc;
     margin: 10px;
+    position: relative;
+    .delete-icon {
+      font-size: 20px;
+      position: absolute;
+      top: -8px;
+      right: -9px;
+    }
   }
 }
 </style>
