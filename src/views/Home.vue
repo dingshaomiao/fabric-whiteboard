@@ -83,7 +83,7 @@
                  class="btn-tool"
                  @click="addCanvas">新建画布</el-button>
       <!-- TODO:只有一个画布时不显示选择画布按钮 -->
-      <el-button v-if="canvasMap.length"
+      <el-button v-if="canvasList.length"
                  size="mini"
                  class="btn-tool"
                  @click="changeCanvas">选择画布</el-button>
@@ -102,7 +102,7 @@
                :close-on-click-modal="false">
       <div class="canvas-box">
         <div class="canvas-item"
-             v-for="(item, index) in canvasMap"
+             v-for="(item, index) in canvasList"
              :key="index">
           <div @click="renderCanvasBtn(item.path, index)"
                style="width: 100%;height: 100%">
@@ -111,7 +111,7 @@
                  alt="">
           </div>
           <div>第{{index + 1}}页</div>
-          <div @click="deleteCanvas(item.path, index)">
+          <div @click="deleteCanvas(item, index)">
             <i class="el-icon-circle-close delete-icon"></i>
           </div>
 
@@ -194,7 +194,7 @@ export default {
       stateIdx: 0, // 当前操作步数
       isRedoing: false, // 当前是否在执行撤销或重做操作
 
-      canvasMap: [],
+      canvasList: [],
       key: 0,
 
       dialogVisible: false,
@@ -590,21 +590,19 @@ export default {
       const dataURL = this.getCanvasDataUrl();
       this.isEditCanvas(dataURL);
       if (!this.isEditCanvasFlag) {
-        // this.canvasMap.set(++this.key, { path: this.canvas.toJSON(), img: dataURL });
-        this.canvasMap.push({ path: this.canvas.toJSON(), img: dataURL });
+        this.canvasList.push({ path: this.canvas.toJSON(), img: dataURL });
       }
 
       this.isEditCanvasFlag = false;
       this.currentCanvas = 0;
       this.isNewCanvas = true;
       this.clear();
-      console.log('快照数据', this.canvasMap);
+      console.log('快照数据', this.canvasList);
     },
 
     isEditCanvas (dataURL) {
-      // this.isEditCanvasFlag && this.canvasMap.set(this.currentCanvas, { path: this.canvas.toJSON(), img: dataURL });
       if (this.isEditCanvasFlag) {
-        this.canvasMap[this.currentCanvas - 1] = { path: this.canvas.toJSON(), img: dataURL };
+        this.canvasList[this.currentCanvas - 1] = { path: this.canvas.toJSON(), img: dataURL };
       }
     },
     // 选择画布
@@ -614,25 +612,34 @@ export default {
       this.isEditCanvas(dataURL);
       if (this.isEditCanvasFlag) return;
       if (this.isNewCanvas) {
-        // this.canvasMap.set(++this.key, { path: this.canvas.toJSON(), img: dataURL });
-        this.canvasMap.push({ path: this.canvas.toJSON(), img: dataURL });
+        this.canvasList.push({ path: this.canvas.toJSON(), img: dataURL });
 
         this.isNewCanvas = false;
       }
 
-      console.log('快照数据', this.canvasMap);
+      console.log('快照数据', this.canvasList);
     },
     handleClose () {
       console.log('handleClose currentCanvas', this.currentCanvas, this.key);
       this.dialogVisible = false;
       if (!this.currentCanvas) {
-        this.currentCanvas = this.canvasMap.length;
+        this.currentCanvas = this.canvasList.length;
         this.isEditCanvasFlag = true;
       }
     },
-    deleteCanvas () {
-
-
+    deleteCanvas (item, index) {
+      if (this.canvasList.length - 1 === index) {
+        this.canvasList.splice(index, 1);
+        if (index === 0) {
+          this.clear();
+          this.dialogVisible = false;
+        } else {
+          this.renderCanvasBtn(this.canvasList[index - 1].path, index - 1);
+        }
+        return;
+      }
+      this.canvasList.splice(index, 1);
+      this.renderCanvasBtn(this.canvasList[index].path, index);
     }
   },
   mounted () {
