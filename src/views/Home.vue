@@ -1,7 +1,8 @@
 <template>
   <div class="home">
+    <div>{{ currentCanvas}}</div>
+    <div>{{isEditCanvasFlag}}</div>
     <!-- 第一行 -->
-    <div>当前画布编码{{currentCanvas}}</div>
     <div class="btn-wrap">
       <div @click="showStrokeColorPicker = !showStrokeColorPicker"
            class="btn-color"
@@ -82,7 +83,7 @@
                  class="btn-tool"
                  @click="addCanvas">新建画布</el-button>
       <!-- TODO:只有一个画布时不显示选择画布按钮 -->
-      <el-button v-if="myMapChangeTracker"
+      <el-button v-if="canvasMap.length"
                  size="mini"
                  class="btn-tool"
                  @click="changeCanvas">选择画布</el-button>
@@ -101,26 +102,31 @@
                :close-on-click-modal="false">
       <div class="canvas-box">
         <div class="canvas-item"
-             v-for="(item, key) in canvasMap"
-             :key="key">
-          <div @click="renderCanvasBtn(item[0], item[1].path)"
+             v-for="(item, index) in canvasMap"
+             :key="index">
+          <div @click="renderCanvasBtn(item.path, index)"
                style="width: 100%;height: 100%">
-            <img :src="item[1].img"
+            <img :src="item.img"
                  style="width: 100%;height: 100%"
                  alt="">
           </div>
+          <div>第{{index + 1}}页</div>
+          <div @click="deleteCanvas(item.path, index)">
+            <i class="el-icon-circle-close delete-icon"></i>
+          </div>
 
-          <i class="el-icon-circle-close delete-icon"></i>
         </div>
       </div>
 
     </el-dialog>
+
   </div>
 </template>
 
 <script>
 import { fabric } from "fabric";
 import { Sketch } from "vue-color";
+import $ from 'jquery';
 import '@/libs/eraser_brush.mixin'
 export default {
   name: "Home",
@@ -188,12 +194,13 @@ export default {
       stateIdx: 0, // 当前操作步数
       isRedoing: false, // 当前是否在执行撤销或重做操作
 
-      canvasMap: new Map(),
+      canvasMap: [],
       key: 0,
 
       dialogVisible: false,
-      myMapChangeTracker: 0,
-      currentCanvas: false,
+
+      currentCanvas: 0,
+      isEditCanvasFlag: false,
       isNewCanvas: false
     };
   },
@@ -567,12 +574,13 @@ export default {
       let zoom = Number(this.canvas.getZoom())
       return (y - this.canvas.viewportTransform[5]) / zoom;
     },
-    renderCanvasBtn (currentCanvas, path) {
+    renderCanvasBtn (path, currentCanvas) {
       // 加载画布信息
       console.log(this.canvas);
       this.canvas.loadFromJSON(path, () => {
         this.canvas.renderAll();
-        this.currentCanvas = currentCanvas;
+        this.currentCanvas = currentCanvas + 1;
+        this.isEditCanvasFlag = true;
         this.dialogVisible = false;
         console.log(' renderCanvasBtn currentCanvas', this.currentCanvas);
       });
@@ -580,36 +588,35 @@ export default {
     // TODO:新建画布后撤销要回到上一个画布的内容
     addCanvas () {
       const dataURL = this.getCanvasDataUrl();
-      const res = this.isEditCanvas(dataURL);
-      console.log('addCanvas isEditCanvas', res);
-      if (!res) {
-        console.log('addCanvas');
-        this.canvasMap.set(++this.key, { path: this.canvas.toJSON(), img: dataURL });
+      this.isEditCanvas(dataURL);
+      if (!this.isEditCanvasFlag) {
+        // this.canvasMap.set(++this.key, { path: this.canvas.toJSON(), img: dataURL });
+        this.canvasMap.push({ path: this.canvas.toJSON(), img: dataURL });
       }
-      this.myMapChangeTracker++;
+
+      this.isEditCanvasFlag = false;
+      this.currentCanvas = 0;
       this.isNewCanvas = true;
       this.clear();
       console.log('快照数据', this.canvasMap);
     },
 
     isEditCanvas (dataURL) {
-      console.log('isEditCanvas currentCanvas', this.currentCanvas);
-      if (!this.currentCanvas) return false;
-      this.canvasMap.set(this.currentCanvas, { path: this.canvas.toJSON(), img: dataURL });
-      this.currentCanvas = 0;
-      return true;
+      // this.isEditCanvasFlag && this.canvasMap.set(this.currentCanvas, { path: this.canvas.toJSON(), img: dataURL });
+      if (this.isEditCanvasFlag) {
+        this.canvasMap[this.currentCanvas - 1] = { path: this.canvas.toJSON(), img: dataURL };
+      }
     },
     // 选择画布
     changeCanvas () {
       this.dialogVisible = true;
       const dataURL = this.getCanvasDataUrl();
-      const res = this.isEditCanvas(dataURL);
-      console.log('changeCanvas isEditCanvas', res, this.isNewCanvas);
-      if (res) return;
+      this.isEditCanvas(dataURL);
+      if (this.isEditCanvasFlag) return;
       if (this.isNewCanvas) {
-        console.log('changeCanvas');
-        this.canvasMap.set(++this.key, { path: this.canvas.toJSON(), img: dataURL });
-        this.myMapChangeTracker++;
+        // this.canvasMap.set(++this.key, { path: this.canvas.toJSON(), img: dataURL });
+        this.canvasMap.push({ path: this.canvas.toJSON(), img: dataURL });
+
         this.isNewCanvas = false;
       }
 
@@ -618,12 +625,21 @@ export default {
     handleClose () {
       console.log('handleClose currentCanvas', this.currentCanvas, this.key);
       this.dialogVisible = false;
-      // if (!this.currentCanvas) {
-      //   this.currentCanvas = this.key;
-      // }
+      if (!this.currentCanvas) {
+        this.currentCanvas = this.canvasMap.length;
+        this.isEditCanvasFlag = true;
+      }
     },
+    deleteCanvas () {
+
+
+    }
   },
   mounted () {
+
+    $("#c").attr("width", $(document).width());
+    $("#c").attr("height", $(document).height() - 184);
+
     // 初始化 画布
     this.initCanvas();
     // 默认开启画笔模式
