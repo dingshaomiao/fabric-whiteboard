@@ -597,8 +597,12 @@ export default {
 
     isEditCanvas (dataURL) {
       const index = this.currentCanvas - 1;
-      this.canvasList[index].path = this.canvas.toJSON();
-      this.canvasList[index].img = dataURL;
+      if (!this.canvasList.length) {
+        this.canvasList.push({ id: this.getID(10), path: this.canvas.toJSON(), img: dataURL })
+      } else {
+        this.canvasList[index].path = this.canvas.toJSON();
+        this.canvasList[index].img = dataURL;
+      }
     },
     // 选择画布
     changeCanvas () {
@@ -616,8 +620,6 @@ export default {
         this.clear();
         // 设置画布背景色 (背景色需要这样设置，否则拓展的橡皮功能会报错)
         this.currentCanvas = 1;
-        const dataURL = this.getCanvasDataUrl();
-        this.canvasList.push({ id: this.getID(10), path: this.canvas.toJSON(), img: dataURL });
         return;
       }
       // this.renderCanvasBtn(this.canvasList[this.currentCanvas - 1].path, this.currentCanvas - 1);
