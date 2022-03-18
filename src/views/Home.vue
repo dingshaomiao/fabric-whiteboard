@@ -100,6 +100,9 @@
                width="80%"
                :before-close="handleClose"
                :close-on-click-modal="false">
+      <div>
+        <el-button @click="isEdit = !isEdit">{{isEdit ? '完成' : '编辑'}}</el-button>
+      </div>
       <div class="canvas-box">
         <div class="canvas-item"
              v-for="(item, index) in canvasList"
@@ -111,7 +114,8 @@
                  alt="">
           </div>
           <div>第{{index + 1}}页</div>
-          <div @click="deleteCanvas(index)">
+          <div @click="deleteCanvas(item, index)"
+               v-if="isEdit">
             <i class="el-icon-circle-close delete-icon"></i>
           </div>
 
@@ -197,6 +201,7 @@ export default {
       canvasList: [],
       currentCanvas: 0,
       dialogVisible: false,
+      isEdit: false
 
     };
   },
@@ -585,13 +590,15 @@ export default {
       const dataURL = this.getCanvasDataUrl();
       this.isEditCanvas(dataURL);
       this.clear();
-      this.canvasList.push({ path: this.canvas.toJSON(), img: dataURL });
+      this.canvasList.push({ id: this.getID(10), path: this.canvas.toJSON(), img: dataURL });
       this.currentCanvas = this.canvasList.length;
       console.log('快照数据', this.canvasList);
     },
 
     isEditCanvas (dataURL) {
-      this.canvasList[this.currentCanvas - 1] = { path: this.canvas.toJSON(), img: dataURL };
+      const index = this.currentCanvas - 1;
+      this.canvasList[index].path = this.canvas.toJSON();
+      this.canvasList[index].img = dataURL;
     },
     // 选择画布
     changeCanvas () {
@@ -604,16 +611,53 @@ export default {
     handleClose () {
       console.log('handleClose currentCanvas', this.currentCanvas);
       this.dialogVisible = false;
-    },
-    deleteCanvas (index) {
-      this.canvasList.splice(index, 1);
-      if (this.canvasList.length === 0) {
+      // 画布全部删除的时候没有renderCanvas
+      if (!this.canvasList.length) {
         this.clear();
-      } else {
-        this.renderCanvasBtn(this.canvasList[index].path, index);
+        // 设置画布背景色 (背景色需要这样设置，否则拓展的橡皮功能会报错)
+        this.currentCanvas = 1;
+        const dataURL = this.getCanvasDataUrl();
+        this.canvasList.push({ id: this.getID(10), path: this.canvas.toJSON(), img: dataURL });
+        return;
       }
-      this.dialogVisible = false;
-    }
+      // this.renderCanvasBtn(this.canvasList[this.currentCanvas - 1].path, this.currentCanvas - 1);
+
+    },
+    // 删除最后一个画布需要建立初始化画布数据
+    deleteCanvas (item, index) {
+      // 当前显示的画布数据
+      const currentCanvasId = this.canvasList[this.currentCanvas - 1].id;
+      // 删除当前画布
+      if (item.id === currentCanvasId) {
+        console.log('删除当前画布', index);
+        if (this.canvasList.length - 1 === index) {
+          this.canvasList.splice(index, 1);
+          if (index !== 0) {
+            this.currentCanvas--
+          }
+          if (index === 0) {
+            this.handleClose();
+          }
+          return;
+        } else {
+          this.canvasList.splice(index, 1);
+        }
+        return;
+      }
+      // 删除当前画布后面的不需要改变
+      if (this.currentCanvas - 1 < index) {
+        this.canvasList.splice(index, 1);
+      }
+      // 删除当前画布前面的，当前画布的需要要减一5
+      if (this.currentCanvas - 1 > index) {
+        this.canvasList.splice(index, 1);
+        this.currentCanvas--
+      }
+    },
+
+    getID (length) {
+      return Number(Math.random().toString().substr(3, length) + Date.now()).toString(36);
+    },
   },
   mounted () {
 
@@ -628,7 +672,7 @@ export default {
     this.initCanvasEvent();
 
     const dataURL = this.getCanvasDataUrl();
-    this.canvasList.push({ path: this.canvas.toJSON(), img: dataURL });
+    this.canvasList.push({ id: this.getID(10), path: this.canvas.toJSON(), img: dataURL });
     this.currentCanvas = 1;
   },
 };
