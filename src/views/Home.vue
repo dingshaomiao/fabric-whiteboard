@@ -1,7 +1,7 @@
 <template>
   <div class="home">
     <div>{{ currentCanvas}}</div>
-    <div>{{isEditCanvasFlag}}</div>
+
     <!-- 第一行 -->
     <div class="btn-wrap">
       <div @click="showStrokeColorPicker = !showStrokeColorPicker"
@@ -111,7 +111,7 @@
                  alt="">
           </div>
           <div>第{{index + 1}}页</div>
-          <div @click="deleteCanvas(item, index)">
+          <div @click="deleteCanvas(index)">
             <i class="el-icon-circle-close delete-icon"></i>
           </div>
 
@@ -195,13 +195,9 @@ export default {
       isRedoing: false, // 当前是否在执行撤销或重做操作
 
       canvasList: [],
-      key: 0,
-
+      currentCanvas: 0,
       dialogVisible: false,
 
-      currentCanvas: 0,
-      isEditCanvasFlag: false,
-      isNewCanvas: false
     };
   },
   watch: {
@@ -574,13 +570,12 @@ export default {
       let zoom = Number(this.canvas.getZoom())
       return (y - this.canvas.viewportTransform[5]) / zoom;
     },
-    renderCanvasBtn (path, currentCanvas) {
+    renderCanvasBtn (path, index) {
       // 加载画布信息
       console.log(this.canvas);
       this.canvas.loadFromJSON(path, () => {
         this.canvas.renderAll();
-        this.currentCanvas = currentCanvas + 1;
-        this.isEditCanvasFlag = true;
+        this.currentCanvas = index + 1;
         this.dialogVisible = false;
         console.log(' renderCanvasBtn currentCanvas', this.currentCanvas);
       });
@@ -589,57 +584,35 @@ export default {
     addCanvas () {
       const dataURL = this.getCanvasDataUrl();
       this.isEditCanvas(dataURL);
-      if (!this.isEditCanvasFlag) {
-        this.canvasList.push({ path: this.canvas.toJSON(), img: dataURL });
-      }
-
-      this.isEditCanvasFlag = false;
-      this.currentCanvas = 0;
-      this.isNewCanvas = true;
       this.clear();
+      this.canvasList.push({ path: this.canvas.toJSON(), img: dataURL });
+      this.currentCanvas = this.canvasList.length;
       console.log('快照数据', this.canvasList);
     },
 
     isEditCanvas (dataURL) {
-      if (this.isEditCanvasFlag) {
-        this.canvasList[this.currentCanvas - 1] = { path: this.canvas.toJSON(), img: dataURL };
-      }
+      this.canvasList[this.currentCanvas - 1] = { path: this.canvas.toJSON(), img: dataURL };
     },
     // 选择画布
     changeCanvas () {
       this.dialogVisible = true;
       const dataURL = this.getCanvasDataUrl();
       this.isEditCanvas(dataURL);
-      if (this.isEditCanvasFlag) return;
-      if (this.isNewCanvas) {
-        this.canvasList.push({ path: this.canvas.toJSON(), img: dataURL });
-
-        this.isNewCanvas = false;
-      }
-
       console.log('快照数据', this.canvasList);
     },
+
     handleClose () {
-      console.log('handleClose currentCanvas', this.currentCanvas, this.key);
+      console.log('handleClose currentCanvas', this.currentCanvas);
       this.dialogVisible = false;
-      if (!this.currentCanvas) {
-        this.currentCanvas = this.canvasList.length;
-        this.isEditCanvasFlag = true;
-      }
     },
-    deleteCanvas (item, index) {
-      if (this.canvasList.length - 1 === index) {
-        this.canvasList.splice(index, 1);
-        if (index === 0) {
-          this.clear();
-          this.dialogVisible = false;
-        } else {
-          this.renderCanvasBtn(this.canvasList[index - 1].path, index - 1);
-        }
-        return;
-      }
+    deleteCanvas (index) {
       this.canvasList.splice(index, 1);
-      this.renderCanvasBtn(this.canvasList[index].path, index);
+      if (this.canvasList.length === 0) {
+        this.clear();
+      } else {
+        this.renderCanvasBtn(this.canvasList[index].path, index);
+      }
+      this.dialogVisible = false;
     }
   },
   mounted () {
@@ -653,6 +626,10 @@ export default {
     this.tapToolBtn("brush");
     // 初始化 画布 事件
     this.initCanvasEvent();
+
+    const dataURL = this.getCanvasDataUrl();
+    this.canvasList.push({ path: this.canvas.toJSON(), img: dataURL });
+    this.currentCanvas = 1;
   },
 };
 </script>
