@@ -131,7 +131,9 @@
 import { fabric } from "fabric";
 import { Sketch } from "vue-color";
 import $ from 'jquery';
-import '@/libs/eraser_brush.mixin'
+import '@/libs/eraser_brush.mixin';
+import { convertBase64UrlToFormData } from '@/utils/common';
+import { ConfigService } from '@/services/configService';
 export default {
   name: "Home",
   components: {
@@ -558,13 +560,24 @@ export default {
 
     // 保存按钮点击
     save () {
-      const dataURL = this.getCanvasDataUrl();
-      const link = document.createElement('a');
-      link.download = 'canvas.png';
-      link.href = dataURL;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+
+      // const dataURL = this.getCanvasDataUrl();
+      // const link = document.createElement('a');
+      // link.download = 'canvas.png';
+      // link.href = dataURL;
+      // document.body.appendChild(link);
+      // link.click();
+      // document.body.removeChild(link);
+      let formData = new FormData();
+      console.log(this.canvasList);
+      this.canvasList.forEach(item => {
+        let blob = convertBase64UrlToFormData(item.img);
+        formData.append('files', blob, Date.now() + '.jpg')
+      })
+      ConfigService.batchUploadFile(formData).then(res => {
+        console.log(res);
+      })
+      console.log(formData);
     },
     // 计算画布移动之后的x坐标点
     getTransformedPosX (x) {
@@ -622,7 +635,7 @@ export default {
         this.currentCanvas = 1;
         return;
       }
-      // this.renderCanvasBtn(this.canvasList[this.currentCanvas - 1].path, this.currentCanvas - 1);
+      this.renderCanvasBtn(this.canvasList[this.currentCanvas - 1].path, this.currentCanvas - 1);
 
     },
     // 删除最后一个画布需要建立初始化画布数据
